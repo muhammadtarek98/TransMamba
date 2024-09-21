@@ -1,23 +1,20 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import math
 from einops import repeat, rearrange
 from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, mamba_inner_fn
 from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
 
 
-class ChannelAttention(nn.Module):
+class ChannelAttention(torch.nn.Module):
     def __init__(self, in_planes, ratio=16):
         super(ChannelAttention, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool1d(1) # b,c,hw -> b,c,1
-        self.max_pool = nn.AdaptiveMaxPool1d(1)
+        self.avg_pool = torch.nn.AdaptiveAvgPool1d(1) # b,c,hw -> b,c,1
+        self.max_pool = torch.nn.AdaptiveMaxPool1d(1)
+        self.fc1   = torch.nn.Conv1d(in_planes, in_planes // ratio, 1, bias=False)
+        self.silu1 = torch.nn.SiLU()
+        self.fc2   = torch.nn.Conv1d(in_planes // ratio, in_planes, 1, bias=False)
 
-        self.fc1   = nn.Conv1d(in_planes, in_planes // ratio, 1, bias=False)
-        self.silu1 = nn.SiLU()
-        self.fc2   = nn.Conv1d(in_planes // ratio, in_planes, 1, bias=False)
-
-        self.sigmoid = nn.Sigmoid()
+        self.sigmoid = torch.nn.Sigmoid()
 
     def forward(self, x): # b,c,hw -> b,c,1
         avg_out = self.fc2(self.silu1(self.fc1(self.avg_pool(x))))
@@ -25,16 +22,13 @@ class ChannelAttention(nn.Module):
         out = avg_out + max_out
         return self.sigmoid(out)
 
-class SpatialAttention(nn.Module):
+class SpatialAttention(torch.nn.Module):
     def __init__(self, kernel_size=7):
         super(SpatialAttention, self).__init__()
-
         assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
         padding = 3 if kernel_size == 7 else 1
-
-        self.conv1 = nn.Conv1d(2, 1, kernel_size, padding=padding, bias=False)
-        self.sigmoid = nn.Sigmoid()
-
+        self.conv1 = torch.nn.Conv1d(2, 1, kernel_size, padding=padding, bias=False)
+        self.sigmoid = torch.nn.Sigmoid()
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True) # b,c,hw -> b,1,hw
         max_out, _ = torch.max(x, dim=1, keepdim=True)
@@ -42,7 +36,7 @@ class SpatialAttention(nn.Module):
         x = self.conv1(x) # b,1,hw
         return self.sigmoid(x)
 
-class Mamba(nn.Module):
+class Mamba(torch.nn.Module):
     def __init__(
         self,
         d_model,
@@ -70,14 +64,12 @@ class Mamba(nn.Module):
         self.d_inner = int(self.expand * self.d_model)
         self.dt_rank = math.ceil(self.d_model / 16) if dt_rank == "auto" else dt_rank
         self.use_fast_path = use_fast_path
+        self.in_proj = torch.nn.Conv2d(self.d_model, self.d_inner * 2, 1, bias=bias, )
 
-#        self.in_proj = nn.Linear(self.d_model, self.d_inner * 2, bias=bias, **factory_kwargs)
-        self.in_proj = nn.Conv2d(self.d_model, self.d_inner * 2, 1, bias=bias, )
-
-        self.dwconv = nn.Conv2d(self.d_inner*2, self.d_inner*2, kernel_size=(5,5), stride=1, padding=(2,2), groups=self.d_inner*2, bias=bias)
+        self.dwconv = torch.nn.Conv2d(self.d_inner*2, self.d_inner*2, kernel_size=(5,5), stride=1, padding=(2,2), groups=self.d_inner*2, bias=bias)
 
 
-        self.conv1d = nn.Conv1d(
+        self.conv1d = torch.nn.Conv1d(
             in_channels=self.d_inner,
             out_channels=self.d_inner,
             bias=conv_bias,
@@ -88,19 +80,19 @@ class Mamba(nn.Module):
         )
 
         self.activation = "silu"
-        self.act = nn.SiLU()
+        self.act = torch.nn.SiLU()
 
-        self.x_proj = nn.Linear(
+        self.x_proj = torch.nn.Linear(
             self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs
         )
-        self.dt_proj = nn.Linear(self.dt_rank, self.d_inner, bias=True, **factory_kwargs)
+        self.dt_proj = torch.nn.Linear(self.dt_rank, self.d_inner, bias=True, **factory_kwargs)
 
         # Initialize special dt projection to preserve variance at initialization
         dt_init_std = self.dt_rank**-0.5 * dt_scale
         if dt_init == "constant":
-            nn.init.constant_(self.dt_proj.weight, dt_init_std)
+            torch.nn.init.constant_(self.dt_proj.weight, dt_init_std)
         elif dt_init == "random":
-            nn.init.uniform_(self.dt_proj.weight, -dt_init_std, dt_init_std)
+            torch.nn.init.uniform_(self.dt_proj.weight, -dt_init_std, dt_init_std)
         else:
             raise NotImplementedError
 
@@ -115,7 +107,6 @@ class Mamba(nn.Module):
             self.dt_proj.bias.copy_(inv_dt)
         # Our initialization would set all Linear.bias to zero, need to mark this one as _no_reinit
         self.dt_proj.bias._no_reinit = True
-
         # S4D real initialization
         A = repeat(
             torch.arange(1, self.d_state + 1, dtype=torch.float32, device=device),
@@ -123,17 +114,14 @@ class Mamba(nn.Module):
             d=self.d_inner,
         ).contiguous()
         A_log = torch.log(A)  # Keep A_log in fp32
-        self.A_log = nn.Parameter(A_log)
+        self.A_log = torch.nn.Parameter(A_log)
         self.A_log._no_weight_decay = True
-
         # D "skip" parameter
-        self.D = nn.Parameter(torch.ones(self.d_inner, device=device))  # Keep in fp32
+        self.D = torch.nn.Parameter(torch.ones(self.d_inner, device=device))  # Keep in fp32
         self.D._no_weight_decay = True
-
-        self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=bias, **factory_kwargs)
+        self.out_proj = torch.nn.Linear(self.d_inner, self.d_model, bias=bias, **factory_kwargs)
         self.sa = SpatialAttention(7)
         self.ca = ChannelAttention(self.d_inner, )
-        
     def forward(self, hidden_states, inference_params=None):
         """
         hidden_states: (B, L, D)
@@ -141,22 +129,10 @@ class Mamba(nn.Module):
         """
         batch, dim, height, width = hidden_states.shape
         seqlen = height * width
-
         conv_state = None
-
         # We do matmul and transpose BLH -> HBL at the same time
-        '''
-        xz = rearrange(
-            self.in_proj.weight @ rearrange(hidden_states, "b l d -> d (b l)"),
-            "d (b l) -> b d l",
-            l=seqlen,
-        )
-        if self.in_proj.bias is not None:
-            xz = xz + rearrange(self.in_proj.bias.to(dtype=xz.dtype), "d -> d 1")
-        '''
         xz = self.dwconv(self.in_proj(hidden_states))
-        xz = rearrange(xz, "b d h w -> b d (h w)") 
-
+        xz = rearrange(xz, "b d h w -> b d (h w)")
         A = -torch.exp(self.A_log.float())  # (d_inner, d_state)
         # In the backward pass we write dx and dz next to each other to avoid torch.cat
         if self.use_fast_path and causal_conv1d_fn is not None and inference_params is None:  # Doesn't support outputting the states
@@ -185,7 +161,7 @@ class Mamba(nn.Module):
             if conv_state is not None:
                 # If we just take x[:, :, -self.d_conv :], it will error if seqlen < self.d_conv
                 # Instead F.pad will pad with zeros if seqlen < self.d_conv, and truncate otherwise.
-                conv_state.copy_(F.pad(x, (self.d_conv - x.shape[-1], 0)))  # Update state (B D W)
+                conv_state.copy_(torch.nn.functional.pad(x, (self.d_conv - x.shape[-1], 0)))  # Update state (B D W)
             if causal_conv1d_fn is None:
                 x = self.act(self.conv1d(x)[..., :seqlen])
             else:
@@ -223,8 +199,4 @@ class Mamba(nn.Module):
             y = rearrange(y, "b d l -> b l d")
             out = self.out_proj(y)
         out = rearrange(out, "b (h w) d -> b d h w", h=height, w=width)
-
-
         return out
-
-

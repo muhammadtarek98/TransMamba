@@ -15,7 +15,7 @@ from natsort import natsorted
 from glob import glob
 import sys
 sys.path.append(os.path.join(os.getcwd(), '..'))
-from basicsr.models.archs.transMamba_arch import TransMamba
+from TransMamba.basicsr.models.archs.transMamba_arch import TransMamba
 from skimage import img_as_ubyte
 from pdb import set_trace as stx
 
@@ -23,8 +23,8 @@ parser = argparse.ArgumentParser(description='Image Deraining using Restormer')
 
 parser.add_argument('--input_dir', default='./Datasets/', type=str, help='Directory of validation images')
 parser.add_argument('--result_dir', default='./results/', type=str, help='Directory for results')
-parser.add_argument('--weights', default='./pretrained_models/deraining.pth', type=str, help='Path to weights')
-parser.add_argument('--yaml', default='Options/Deraining_transMamba.yml', type=str, help='Path to yaml')
+parser.add_argument('--weights', default='/home/muhammad/projects/UW_CycleGAN/TransMamba/Deraining/pretrained_models/TransMamba_Rain200H.pth', type=str, help='Path to weights')
+parser.add_argument('--yaml', default='/home/muhammad/projects/UW_CycleGAN/TransMamba/Deraining/Options/Deraining_transMamba_Rain200L.yml', type=str, help='Path to yaml')
 args = parser.parse_args()
 
 ####### Load yaml #######

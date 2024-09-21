@@ -1,28 +1,25 @@
 import torch
-from torch import nn as nn
-from torch.nn import functional as F
 import numpy as np
-
-from basicsr.models.losses.loss_util import weighted_loss
+from TransMamba.basicsr.models.losses.loss_util import weighted_loss
 
 _reduction_modes = ['none', 'mean', 'sum']
 
 
 @weighted_loss
 def l1_loss(pred, target):
-    return F.l1_loss(pred, target, reduction='none')
+    return torch.nn.functional.l1_loss(pred, target, reduction='none')
 
 
 @weighted_loss
 def mse_loss(pred, target):
-    return F.mse_loss(pred, target, reduction='none')
+    return torch.nn.functional.mse_loss(pred, target, reduction='none')
 
 
 # @weighted_loss
 # def charbonnier_loss(pred, target, eps=1e-12):
 #     return torch.sqrt((pred - target)**2 + eps)
 
-class CoherenceLoss(nn.Module):
+class CoherenceLoss(torch.nn.Module):
 
     def __init__(self, loss_weight=1.0, reduction='mean'):
         super(CoherenceLoss, self).__init__()
@@ -41,7 +38,7 @@ class CoherenceLoss(nn.Module):
         return self.loss_weight * self.compute_coherence(
             pred, target).mean()
 
-class L1Loss(nn.Module):
+class L1Loss(torch.nn.Module):
     """L1 (mean absolute error, MAE) loss.
 
     Args:
@@ -70,7 +67,7 @@ class L1Loss(nn.Module):
         return self.loss_weight * l1_loss(
             pred, target, weight, reduction=self.reduction)
 
-class MSELoss(nn.Module):
+class MSELoss(torch.nn.Module):
     """MSE (L2) loss.
 
     Args:
@@ -99,7 +96,7 @@ class MSELoss(nn.Module):
         return self.loss_weight * mse_loss(
             pred, target, weight, reduction=self.reduction)
 
-class PSNRLoss(nn.Module):
+class PSNRLoss(torch.nn.Module):
 
     def __init__(self, loss_weight=1.0, reduction='mean', toY=False):
         super(PSNRLoss, self).__init__()
@@ -126,7 +123,7 @@ class PSNRLoss(nn.Module):
 
         return self.loss_weight * self.scale * torch.log(((pred - target) ** 2).mean(dim=(1, 2, 3)) + 1e-8).mean()
 
-class CharbonnierLoss(nn.Module):
+class CharbonnierLoss(torch.nn.Module):
     """Charbonnier Loss (L1)"""
 
     def __init__(self, loss_weight=1.0, reduction='mean', eps=1e-3):

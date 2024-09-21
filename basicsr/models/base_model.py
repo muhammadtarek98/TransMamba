@@ -7,8 +7,8 @@ from torch.nn.parallel import DataParallel, DistributedDataParallel
 import sys
 
 
-from basicsr.models import lr_scheduler as lr_scheduler
-from basicsr.utils.dist_util import master_only
+from TransMamba.basicsr.models import lr_scheduler as lr_scheduler
+from TransMamba.basicsr.utils.dist_util import master_only
 
 logger = logging.getLogger('basicsr')
 

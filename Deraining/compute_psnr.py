@@ -10,7 +10,6 @@ from skimage.metrics import peak_signal_noise_ratio
 import torch
 from tqdm import tqdm
 
-#from niqe.niqe import compute_niqe
 
 #criterion = lpips.LPIPS(net='vgg', lpips=True, pnet_rand=False, pretrained=True).cuda()
 def rgb2ycbcr(im, only_y=True):

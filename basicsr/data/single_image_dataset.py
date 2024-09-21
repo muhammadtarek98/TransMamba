@@ -2,9 +2,10 @@ from os import path as osp
 from torch.utils import data as data
 from torchvision.transforms.functional import normalize
 
-from basicsr.data.data_util import paths_from_lmdb
-from basicsr.utils import FileClient, imfrombytes, img2tensor, scandir
-
+from TransMamba.basicsr.data.data_util import paths_from_lmdb
+from TransMamba.basicsr.utils.file_client import FileClient
+from TransMamba.basicsr.utils.img_util import imfrombytes, img2tensor
+from TransMamba.basicsr.utils.misc import scandir
 
 class SingleImageDataset(data.Dataset):
     """Read only lq images in the test phase.
