@@ -3,13 +3,13 @@ import torch
 from collections import OrderedDict
 from copy import deepcopy
 from os import path as osp
-from TransMamba.basicsr.models.archs.arch_util import define_network
+from TransMamba.basicsr.models.define_model import create_model
 from TransMamba.basicsr.models.base_model import BaseModel
 from TransMamba.basicsr.utils.logger import get_root_logger
 from TransMamba.basicsr.utils.img_util import imwrite, tensor2img
 
-loss_module = importlib.import_module('basicsr.models.losses')
-metric_module = importlib.import_module('basicsr.metrics')
+loss_module = importlib.import_module('TransMamba.basicsr.models.losses')
+metric_module = importlib.import_module('TransMamba.basicsr.metrics')
 import os
 import random
 import torch.nn.functional as F
