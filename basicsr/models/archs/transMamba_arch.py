@@ -4,7 +4,7 @@
 import torch
 import numbers
 from einops import rearrange
-from .mamba import Mamba
+from TransMamba.basicsr.models.archs.mamba import Mamba
 ##########################################################################
 ## Layer Norm
 
