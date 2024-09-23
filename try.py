@@ -34,3 +34,4 @@ def transform_image(img):
             "gc":torch.unsqueeze(input=gc_tensor,dim=0),
             "he":torch.unsqueeze(input=he_tensor,dim=0)}
 if __name__ =="__main__":
+    image=
